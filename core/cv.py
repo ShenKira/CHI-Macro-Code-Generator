@@ -57,7 +57,7 @@ class CVExperiment(Experiment):
         return estimate_cv_time(self.eh, self.el, self.v, self.cl)
 
     def to_macro(self, project_name: str) -> str:
-        fname = f"{project_name}_CV_{self.eh}V_v={self.v}"
+        fname = f"{project_name}_CV_{self.eh}V_{self.v}V/s"
         if self.index is not None:
             fname += f"_{self.index}"
 
