@@ -8,13 +8,15 @@ Created on Tue Dec 30 12:09:21 2025
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLineEdit, QLabel,
-    QFileDialog, QTableWidget, QTableWidgetItem
+    QFileDialog, QTableWidget, QTableWidgetItem,
+    QMessageBox
 )
 from core.project import Project
 from gui.cv_dialog import CVDialog
 from gui.eis_dialog import EISDialog
 from gui.macro_dialog import MacroDialog
 from gui.cp_dialog import CPDialog
+from utils.filename import validate_project_name
 from PySide6.QtWidgets import QHeaderView
 from PySide6.QtWidgets import QMenu
 from PySide6.QtCore import Qt
@@ -139,11 +141,20 @@ class MainWindow(QWidget):
     def generate_macro(self):
         if not self.project:
             return
+        
+        project_name = self.project_name.text().strip()
+        
+        # 验证项目名是否合法（不包含 . 和 /）
+        if not validate_project_name(project_name):
+            QMessageBox.warning(
+                self,
+                "项目名非法",
+                "项目名不能包含 '.' 或 '/' 字符。\n\n请修改项目名后重试。"
+            )
+            return
+        
         # 生成前更新项目的最新信息
-        self.project.update(
-            self.project_name.text(),
-            self.folder_edit.text()
-        )
+        self.project.update(project_name, self.folder_edit.text())
         dlg = MacroDialog(self.project)
         dlg.exec()
         

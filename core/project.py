@@ -10,6 +10,7 @@ from core.cv import CVExperiment
 from core.eis import EISExperiment
 from core.cp import CPExperiment  
 from datetime import datetime
+import os
 
 
 
@@ -54,3 +55,24 @@ class Project:
             blocks.append(exp.to_macro(self.name))
     
         return "\n\n".join(blocks)
+
+    def get_save_paths(self) -> list:
+        """返回将由宏保存的所有目标文件的绝对路径列表。"""
+        # 确保索引已分配（EIS start_index, CV index 等）
+        try:
+            self._reindex()
+        except Exception:
+            pass
+
+        paths = []
+        for exp in self.experiments:
+            # 每个实验应实现 get_filenames(project_name)
+            if not hasattr(exp, "get_filenames"):
+                continue
+            fnames = exp.get_filenames(self.name)
+            for fname in fnames:
+                # fname 可能使用 '/' 作为子目录分隔符，按平台转换并生成绝对路径
+                parts = fname.split("/")
+                full = os.path.abspath(os.path.normpath(os.path.join(self.folder, *parts)))
+                paths.append(full)
+        return paths

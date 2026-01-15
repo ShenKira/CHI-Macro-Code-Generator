@@ -6,6 +6,7 @@ CP experiment implementation compatible with the Experiment base class.
 """
 
 from core.experiment import Experiment
+from utils.filename import format_number, format_scientific
 
 
 class CPExperiment(Experiment):
@@ -46,7 +47,14 @@ class CPExperiment(Experiment):
         )
 
     def to_macro(self, project_name: str) -> str:
-        fname = f"{project_name}_CP_{self.ic}_{self.ia}_{self.eh}V"
+        # 电流值可能很小，用科学记数法格式化
+        ic_str = f"{self.ic:.10e}".rstrip('0').rstrip('.')
+        ia_str = f"{self.ia:.10e}".rstrip('0').rstrip('.')
+        ic_fmt = format_scientific(ic_str)
+        ia_fmt = format_scientific(ia_str)
+        eh_fmt = format_number(self.eh)
+        
+        fname = f"{project_name}_CP_{ic_fmt}_{ia_fmt}_{eh_fmt}V"
         return f"""
 tech=cp
 ic={self.ic}
@@ -64,4 +72,15 @@ prioe
 run
 save:{fname}
 tsave:{fname}
-""".strip()
+""".strip().strip()
+
+    def get_filenames(self, project_name: str) -> list:
+        # 电流值可能很小，用科学记数法格式化
+        ic_str = f"{self.ic:.10e}".rstrip('0').rstrip('.')
+        ia_str = f"{self.ia:.10e}".rstrip('0').rstrip('.')
+        ic_fmt = format_scientific(ic_str)
+        ia_fmt = format_scientific(ia_str)
+        eh_fmt = format_number(self.eh)
+        
+        fname = f"{project_name}_CP_{ic_fmt}_{ia_fmt}_{eh_fmt}V"
+        return [fname]

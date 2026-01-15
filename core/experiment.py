@@ -19,3 +19,10 @@ class Experiment(ABC):
     def signature(self) -> tuple:
         """用于判断实验是否“参数完全相同”"""
         pass
+
+    @abstractmethod
+    def get_filenames(self, project_name: str) -> list:
+        """返回该实验在保存数据时使用的文件名（可能有多个），不包含父目录。
+        例: ['proj_CV_0.5V_0.01V/s_1']
+        """
+        pass

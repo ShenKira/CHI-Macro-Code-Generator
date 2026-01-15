@@ -64,3 +64,10 @@ tsave={fname}
             f"{self.fh:.1e} Hz → {self.fl:.1e} Hz | "
             f"amp={self.amp} V | x{self.repeat}"
         )
+
+    def get_filenames(self, project_name: str) -> list:
+        names = []
+        for i in range(self.repeat):
+            idx = (self.start_index or 0) + i
+            names.append(f"{project_name}_EIS_{idx}")
+        return names

@@ -9,6 +9,7 @@ from core.experiment import Experiment
 from utils.sensitivity import auto_sensitivity
 from utils.time_estimate import estimate_cv_time
 from utils.sensitivity import sens_to_str
+from utils.filename import format_number, format_unit
 
 class CVExperiment(Experiment):
     def __init__(
@@ -57,7 +58,11 @@ class CVExperiment(Experiment):
         return estimate_cv_time(self.eh, self.el, self.v, self.cl)
 
     def to_macro(self, project_name: str) -> str:
-        fname = f"{project_name}_CV_{self.eh}V_{self.v}V/s"
+        eh_fmt = format_number(self.eh)
+        v_fmt = format_number(self.v)
+        unit_fmt = format_unit("V/s")
+        
+        fname = f"{project_name}_CV_{eh_fmt}V_{v_fmt}{unit_fmt}"
         if self.index is not None:
             fname += f"_{self.index}"
 
@@ -75,3 +80,13 @@ run
 save:{fname}
 tsave:{fname}
 """.strip()
+
+    def get_filenames(self, project_name: str) -> list:
+        eh_fmt = format_number(self.eh)
+        v_fmt = format_number(self.v)
+        unit_fmt = format_unit("V/s")
+        
+        fname = f"{project_name}_CV_{eh_fmt}V_{v_fmt}{unit_fmt}"
+        if self.index is not None:
+            fname += f"_{self.index}"
+        return [fname]
