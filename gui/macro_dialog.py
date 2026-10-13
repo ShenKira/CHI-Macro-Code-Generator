@@ -13,12 +13,13 @@ import os
 
 
 class MacroDialog(QDialog):
-    def __init__(self, project):
+    def __init__(self, project, macro_overrides=None):
         super().__init__()
         self.setWindowTitle("生成的 Macro")
 
         self.text = QTextEdit()
-        self.text.setPlainText(project.to_macro())
+        self.resize(850, 650)
+        self.text.setPlainText(project.to_macro(macro_overrides))
         self.text.setReadOnly(True)
 
         # 在展示宏之前，检查所有将被保存的数据文件路径长度是否可能超出 Windows 限制

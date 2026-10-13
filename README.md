@@ -1,109 +1,89 @@
 # CHI Macro Generator
 
-一个用于 **CHI660E 电化学工作站** 的图形化 **Macro Command 代码生成工具**。  
-通过模块化方式配置 **CV / EIS / CP** 实验，自动生成规范、可重复的测试脚本。
+用于 CHI660E 电化学工作站的 PySide6 图形化宏代码生成工具。试验定义、参数窗口、宏生成与 JSON 保存共用同一套元数据，支持按任意顺序组合试验。
 
-A graphical macro code generator for **CHI660E electrochemical workstations**,  
-designed to build **CV / EIS / CP** experiments in a modular and reproducible way.
+## 功能
 
----
+- 31 类试验的参数配置、编辑、JSON 保存与读取，参数说明依据 CHI660E 帮助文档整理。
+- 默认快捷添加 CV、EIS、CP、I-T、PSA；“添加其他试验”可按中文名称或缩写搜索全部方法。
+- “试验设置”可勾选、调整快捷按钮顺序，保存后立即生效，也可直接编辑配置文件。
+- 通用参数表单支持科学计数法、中文名称、范围和相关参数校验、宏命令预览。
+- CP 支持电位／时间优先、零电流、首段极性、保持时间、辅助信号和零电流观察预设。
+- 支持拖拽排序、双击／右键编辑、删除和 Ctrl+Z 撤销。
+- 参数记忆保存到配置文件，重启后恢复；旧四类项目 JSON 继续可读。
+- 各类试验统一编号保存文件，重复 CP 不再使用相同文件名。
+- 耗时依赖样品响应的方法显示“无法确定总耗时”，避免把未确定的耗时算作 0。
 
-## ✨ Features | 功能特点
+## 试验目录及文档限制
 
-- 图形界面配置 **CV / EIS / CP** 测试参数
-- 模块化添加实验，支持任意顺序组合
-- 自动生成 CHI 宏命令（Macro Command）脚本
-- 自动估算总测试耗时
-- 所有参数在软件重启后自动记忆上一次使用值
-- 明确的参数校验，避免生成非法代码
-- 适用于 Windows（CHI 官方软件环境）
+CV、LSV、SCV、TAFEL、CA、CC、DPV、NPV、DNPV、SWV、ACV、SHACV、FTACV、IT、DPA、DDPA、TPA、IPAD、BE、HMV、SSF、STEP、EIS、IMPT、IMPE、CP、CPCR、ISTEP、PSA、ECN、OCPT。
 
----
+**文档给出了 31 类参数页，但没有给出 FTACV、DPA、DDPA、TPA、IPAD 的专用宏命令。**这五类可配置和保存；导出前需在“试验设置 → 宏命令映射”补充经 CHI 软件确认的命令。缺少映射时会明确报错，不会猜测命令或忽略参数。
 
-## 🧪 Supported Experiments | 支持的实验类型
+部分显示、开路清洗、阻抗平均参数也存在同样限制。“设置”未勾选表示沿用仪器已有设置；勾选后若缺少映射则禁止导出。详见 [试验与命令映射说明](docs/TECHNIQUE_MAPPING.md)。
 
-本软件支持 CHI660E 常用的三类基础电化学测试，所有测试均以模块形式组合，并最终生成 Macro Command 脚本。
+## 使用
 
-### CV – Cyclic Voltammetry
-- 起始电位 / 高低电位
-- 扫描速率
-- 扫描圈数
-- 静息时间等
+1. 用项目所需的 Python 和 PySide6 环境运行 `python main.py`。
+2. 设置项目名和 CHI 软件保存数据的目录。
+3. 用快捷按钮或“添加其他试验”配置试验；在参数窗口的“宏命令预览”核对设置。
+4. 按需排序、编辑、删除或保存项目 JSON。
+5. 点击“生成代码”预览并保存 TXT，在 CHI 软件的宏编辑器中 Test 后运行。
 
-### EIS – Electrochemical Impedance Spectroscopy
-- 最高频率 `fh`
-- 最低频率 `fl`
-- 交流扰动幅度 `amp`
-- 静息时间 `qt`
-- 重复测试次数
+当前开发验证环境：Python 3.13.9、PySide6 6.9.2。
 
-### CP – Chronopotentiometry（恒流充放电）
-- 阴极电流 `ic`（支持科学计数法输入，如 `1e-4`）
-- 阳极电流 `ia`（支持科学计数法输入）
-- 高 / 低电位限制 `eh` / `el`
-- 高 / 低电位保持时间 `heht` / `leht`
-- 起始电流极性 `pn`（`p` / `n`）
-- 数据存储间隔 `si`
-- 段数 `cl`（segments）
+## 快捷配置
 
-> 注：
-> - CP 模式下程序固定采用 **电势优先（prioe）** 模式。
-> - CP 的测试耗时为估算值，仅用于流程规划参考。
+配置文件为 `config/experiments.json`：
 
----
+```json
+{
+  "version": 1,
+  "quick_experiments": ["CV", "EIS", "CP", "IT", "PSA"],
+  "macro_overrides": {},
+  "last_parameters": {}
+}
+```
 
-## 🚀 Usage | 使用流程
+`quick_experiments` 的顺序即按钮顺序；可使用目录中任意类型，也允许空列表，此时仍保留“添加其他试验”。`last_parameters` 由参数窗口自动维护。读取错误时使用默认配置并保留原文件，不自动覆盖损坏的设置。
 
-### 中文说明
+## 模块结构
 
-1. 启动软件
-2. **在生成代码之前，务必先完整设置所有参数**
-3. 点击 **“添加 CV”**、**“添加 EIS”** 或 **“添加 CP”**，将实验加入测试序列
-4. 根据需要重复添加多个实验模块
-5. 在下方查看 **预计总测试耗时**
-6. 点击 **生成代码**，导出 CHI Macro Command 脚本
-7. 将生成的脚本导入 CHI 官方软件并运行
+- `core/techniques/schema.py`：字段、范围、中文标签和验证规则。
+- `core/techniques/voltammetry.py`、`amperometry.py`、`impedance.py`、`potentiometry.py`：按方法类别组织定义。
+- `core/techniques/registry.py`：静态注册与兼容旧类型的工厂。
+- `core/configured_experiment.py`：公共宏生成、序列化、摘要和耗时计算。
+- `gui/experiment_dialog.py`：自动生成所有试验的参数窗口。
+- `gui/settings_dialog.py`：快捷列表及宏映射配置。
+- `utils/app_config.py`：路径解析、配置校验、原子保存和参数记忆。
 
-⚠️ **重要提示**：
-- 生成代码时，程序将直接使用当前界面中的参数值
-- 若参数未设置或设置错误，将直接影响生成的 Macro Command
+新增方法时增加试验定义并加入相应分类的 `TECHNIQUES` 即可；主窗口和 JSON 分发无需增加一组分支。
 
----
+## Nuitka 打包
 
-### English Instructions
+在已安装 Nuitka 和 PySide6 的 Python 环境中，从项目目录运行 `build.bat 1.7.0 both`。可将 `both` 换成 `standalone` 或 `onefile`；不传版本号时脚本会询问。脚本先使用当前 Python；若缺少依赖，会自动查找用户目录或 Anaconda 目录中的 `nuitka_pack` 环境。也可设置 `NUITKA_PYTHON` 为指定 `python.exe` 的完整路径。脚本先运行项目测试，再由 Nuitka 自动定位最新 MSVC；缺少依赖时会报错并停止。
 
-1. Launch the software
-2. **Make sure all parameters are fully configured before generating code**
-3. Click **Add CV**, **Add EIS**, or **Add CP** to append an experiment module
-4. Add multiple modules in any desired order
-5. Check the **estimated total experiment time**
-6. Click **Generate Code** to export the CHI Macro Command script
-7. Import the script into the official CHI software and run it
+产物保存在 `release/v1.7.0/standalone/main.dist/` 与 `release/v1.7.0/onefile/`，Nuitka 编译缓存位于 `release/.nuitka-cache/`。同版本的对应构建已存在时脚本会停止，避免覆盖旧产物及用户改过的配置；也可以先构建 standalone，再用相同版本号构建 onefile。版本号请按实际发布号填写。
 
-⚠️ **Important**:
-- Code generation uses the current GUI parameter values directly
-- Incorrect or incomplete parameters will result in invalid macro scripts
+- standalone：配置保存在 exe 旁的 `config/experiments.json`。
+- onefile：配置作为外部数据交付，保存在原始 exe 旁，不写入临时解包目录。
+- 分发时把产物目录内的 `config` 目录一起复制；没有配置文件时使用内置默认值。
 
----
+导入使用明确的 Python 模块引用，不按文件名扫描插件，不在运行时解析 CHM。
 
-## 📦 Release | 发布说明
+## 验证
 
-- Windows 可执行文件通过 **Nuitka** 编译生成
-- 可在 GitHub **Releases** 页面下载对应版本的 `.exe`
-- Release 中通常包含：
-  - 编译后的可执行文件
-  - 对应版本说明（Changelog）
+```text
+python -m unittest discover -s tests -v
+```
 
----
+测试覆盖全部类型的序列化、文档命令清单、CP 模式与半周期时间、旧项目、重复文件名、配置保护和 GUI 交互。实际仪器行为仍须在对应版本的 CHI 软件与工作站上验证。
 
-## 📄 License | 许可
+## License
 
-Internal research tool.  
+Internal research tool.
 Free to modify and adapt for academic and laboratory use.
 
----
-
-## 👤 Author
+## Author
 
 Powered by **ShenKira**
-

@@ -1,0 +1,31 @@
+# Python and test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/.tmp-*/
+
+# Local environments and editor settings
+.venv/
+venv/
+.idea/
+.vscode/
+.claude/
+
+# Nuitka output and diagnostics
+*.exe
+main.build/
+main.dist/
+main.onefile-build/
+CHI-MACRO-GEN-v*/
+CHIMacroGen_StandAlone_v*/
+release/
+nuitka-crash-report.xml
+
+# Local reference material, experiments, and working notes
+*.chm
+chm_extracted_manual/
+TEST/
+1.json
+Vibe_Coding_Outline.md

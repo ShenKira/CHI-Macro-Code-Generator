@@ -132,4 +132,6 @@ def validate_project_name(name: str) -> bool:
     Returns:
         bool: True 如果合法，False 如果包含非法字符
     """
-    return "." not in name and "/" not in name
+    return (bool(name.strip()) and name == name.strip()
+            and not any(c in name for c in '.<>:"/\\|?*\r\n#;')
+            and not name.endswith(' '))

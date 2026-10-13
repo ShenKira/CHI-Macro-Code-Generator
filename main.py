@@ -10,10 +10,15 @@ from PySide6.QtWidgets import QApplication
 from gui.main_window import MainWindow
 from PySide6.QtGui import QFont
 
-app = QApplication(sys.argv)
-font = QFont()
-font.setPointSizeF(font.pointSizeF() * 1.5)
-app.setFont(font)
-window = MainWindow()
-window.show()
-sys.exit(app.exec())
+def main():
+    app = QApplication(sys.argv)
+    font = QFont()
+    font.setPointSizeF(font.pointSizeF() * 1.5)
+    app.setFont(font)
+    window = MainWindow()
+    window.show()
+    return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

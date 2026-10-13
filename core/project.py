@@ -5,11 +5,9 @@ Created on Tue Dec 30 12:06:36 2025
 @author: shenz
 """
 
-from utils.naming import assign_cv_indices
-from core.cv import CVExperiment
-from core.eis import EISExperiment
-from core.cp import CPExperiment
 from core.experiment import Experiment
+from core.configured_experiment import MacroMappingError
+from utils.filename import validate_project_name
 from datetime import datetime
 import json
 import os
@@ -27,23 +25,44 @@ class Project:
         self._reindex()
 
     def _reindex(self):
-        assign_cv_indices(self.experiments)
-
-        eis_counter = 1
+        counters = {}
         for exp in self.experiments:
-            if isinstance(exp, EISExperiment):
-                exp.start_index = eis_counter
-                eis_counter += exp.repeat
+            exp.start_index = counters.get(exp.exp_type, 1)
+            counters[exp.exp_type] = exp.start_index + exp.repeat
 
-    def total_time(self) -> float:
-        return sum(exp.estimate_time() for exp in self.experiments)
+    def time_info(self) -> tuple[float, int, bool]:
+        durations = [exp.estimate_time() for exp in self.experiments]
+        return (sum(t for t in durations if t is not None),
+                sum(t is None for t in durations),
+                any(exp.time_is_upper_bound for exp in self.experiments))
+
+    def total_time(self) -> float | None:
+        known, unknown, _ = self.time_info()
+        return None if unknown else known
     
     def update(self, name: str, folder: str):
         """更新项目名和路径"""
         self.name = name
         self.folder = folder
 
-    def to_macro(self) -> str:
+    def macro_issues(self, macro_overrides=None) -> list[str]:
+        issues = []
+        for i, exp in enumerate(self.experiments, 1):
+            try:
+                exp.parameter_commands(macro_overrides)
+            except ValueError as exc:
+                issues.append(f"第 {i} 项 {exp.exp_type}：{exc}")
+        return issues
+
+    def to_macro(self, macro_overrides=None) -> str:
+        if not validate_project_name(self.name):
+            raise ValueError("项目名为空或包含文件名／宏命令不允许的字符。")
+        if not self.folder or any(c in self.folder for c in "\r\n#;"):
+            raise ValueError("输出目录为空或包含宏命令不允许的字符。")
+        issues = self.macro_issues(macro_overrides)
+        if issues:
+            raise MacroMappingError("\n".join(issues))
+        self._reindex()
         now = datetime.now().strftime("%Y/%m/%d  %H:%M")
 
         header = [
@@ -54,13 +73,14 @@ class Project:
 
         blocks = header[:]
         for exp in self.experiments:
-            blocks.append(exp.to_macro(self.name))
+            blocks.append(exp.to_macro(self.name, macro_overrides))
 
         return "\n\n".join(blocks)
 
     def to_dict(self) -> dict:
         """序列化整个项目为字典"""
         return {
+            "schema_version": 2,
             "project_name": self.name,
             "folder": self.folder,
             "experiments": [exp.to_dict() for exp in self.experiments],
@@ -77,7 +97,8 @@ class Project:
         proj = Project(data["project_name"], data["folder"])
         for exp_data in data.get("experiments", []):
             exp = Experiment.from_dict(exp_data)
-            proj.add_experiment(exp)
+            proj.experiments.append(exp)
+        proj._reindex()
         return proj
 
     @staticmethod
@@ -90,10 +111,7 @@ class Project:
     def get_save_paths(self) -> list:
         """返回将由宏保存的所有目标文件的绝对路径列表。"""
         # 确保索引已分配（EIS start_index, CV index 等）
-        try:
-            self._reindex()
-        except Exception:
-            pass
+        self._reindex()
 
         paths = []
         for exp in self.experiments:

@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "quick_experiments": ["CV", "EIS", "CP", "IT", "PSA"],
+  "macro_overrides": {},
+  "last_parameters": {}
+}

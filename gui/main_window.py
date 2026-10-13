@@ -9,15 +9,17 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLineEdit, QLabel,
     QFileDialog, QTableWidget, QTableWidgetItem,
-    QMessageBox, QAbstractItemView
+    QMessageBox, QAbstractItemView, QTabWidget, QScrollArea
 )
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QShortcut, QKeySequence
 from core.project import Project
-from gui.cv_dialog import CVDialog
-from gui.eis_dialog import EISDialog
 from gui.macro_dialog import MacroDialog
-from gui.cp_dialog import CPDialog
+from gui.experiment_dialog import ExperimentDialog
+from gui.other_experiment_dialog import OtherExperimentDialog
+from gui.settings_dialog import SettingsDialog
+from core.techniques.registry import get_technique
+from utils.app_config import AppConfig
 from utils.filename import validate_project_name
 from PySide6.QtWidgets import QHeaderView
 from PySide6.QtWidgets import QMenu
@@ -122,9 +124,11 @@ class DragTableWidget(QTableWidget):
 #  MainWindow
 # ============================================================
 class MainWindow(QWidget):
-    def __init__(self):
+    def __init__(self, config=None):
         super().__init__()
         self.setWindowTitle("CHI Macro Generator")
+        self.resize(1200, 750)
+        self.config = config if config is not None else AppConfig()
 
         self.project = None
         self.undo_manager = UndoManager()
@@ -143,25 +147,25 @@ class MainWindow(QWidget):
         top.addWidget(browse_btn)
 
         # ---- 左侧：添加按钮 ----
-        self.add_cv_btn = QPushButton("添加 CV")
-        self.add_eis_btn = QPushButton("添加 EIS")
-        self.add_cp_btn = QPushButton("添加 CP")
-        self.add_cv_btn.clicked.connect(self.add_cv)
-        self.add_eis_btn.clicked.connect(self.add_eis)
-        self.add_cp_btn.clicked.connect(self.add_cp)
-
-        left = QVBoxLayout()
-        left.addWidget(self.add_cv_btn)
-        left.addWidget(self.add_eis_btn)
-        left.addWidget(self.add_cp_btn)
-        left.addStretch()
+        self.quick_tabs = QTabWidget()
+        self.quick_tabs.setMinimumWidth(210)
+        self.quick_tabs.setMaximumWidth(280)
+        self.quick_page = QWidget()
+        self.quick_layout = QVBoxLayout(self.quick_page)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.quick_page)
+        self.quick_tabs.addTab(scroll, "快捷添加")
+        self.rebuild_quick_buttons()
 
         # ---- 中间：可拖拽表格 ----
         self.table = DragTableWidget(0, 3)
+        self.table.verticalHeader().setVisible(False)
         self.table.setHorizontalHeaderLabels(["序号", "类型", "参数摘要"])
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.show_table_menu)
         self.table.reordered.connect(self.on_rows_reordered)
+        self.table.cellDoubleClicked.connect(lambda row, _: self.edit_experiment(row))
 
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -169,7 +173,7 @@ class MainWindow(QWidget):
         header.setSectionResizeMode(2, QHeaderView.Stretch)
 
         center = QHBoxLayout()
-        center.addLayout(left)
+        center.addWidget(self.quick_tabs)
         center.addWidget(self.table)
 
         # ---- 耗时标签 ----
@@ -194,6 +198,10 @@ class MainWindow(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addLayout(top)
+        if self.config.error:
+            error = QLabel(f"设置文件读取失败，已使用默认快捷列表；原文件已保留：{self.config.error}")
+            error.setWordWrap(True)
+            layout.addWidget(error)
         layout.addLayout(center)
         layout.addWidget(self.time_label)
         layout.addLayout(btn_layout)
@@ -228,27 +236,68 @@ class MainWindow(QWidget):
     #  添加实验（操作前保存撤销快照）
     # ================================================================
     def add_cv(self):
-        self.ensure_project()
-        dlg = CVDialog(self)
-        if dlg.exec():
-            self._save_undo_state()
-            self.project.add_experiment(dlg.result)
-            self.refresh()
+        self.add_experiment("CV")
 
     def add_eis(self):
-        self.ensure_project()
-        dlg = EISDialog(self)
-        if dlg.exec():
-            self._save_undo_state()
-            self.project.add_experiment(dlg.result)
-            self.refresh()
+        self.add_experiment("EIS")
 
     def add_cp(self):
+        self.add_experiment("CP")
+
+    def add_it(self):
+        self.add_experiment("IT")
+
+    def add_psa(self):
+        self.add_experiment("PSA")
+
+    def rebuild_quick_buttons(self):
+        while self.quick_layout.count():
+            item = self.quick_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self.quick_buttons = {}
+        for code in self.config.quick_experiments:
+            caption = "I-T" if code == "IT" else code
+            button = QPushButton(f"添加 {caption}")
+            button.setObjectName(f"add_{code.lower()}")
+            button.setToolTip(get_technique(code).name)
+            button.clicked.connect(lambda _, exp_type=code: self.add_experiment(exp_type))
+            self.quick_buttons[code] = button
+            setattr(self, f"add_{code.lower()}_btn", button)
+            self.quick_layout.addWidget(button)
+        self.add_other_btn = QPushButton("添加其他试验…")
+        self.add_other_btn.clicked.connect(self.add_other_experiment)
+        self.quick_layout.addWidget(self.add_other_btn)
+        settings = QPushButton("试验设置…")
+        settings.clicked.connect(self.configure_experiments)
+        self.quick_layout.addWidget(settings)
+        self.quick_layout.addStretch()
+
+    def add_other_experiment(self):
+        chooser = OtherExperimentDialog(self)
+        if chooser.exec():
+            self.add_experiment(chooser.selected_type)
+
+    def configure_experiments(self):
+        if SettingsDialog(self.config, self).exec():
+            self.rebuild_quick_buttons()
+
+    def add_experiment(self, exp_type):
         self.ensure_project()
-        dlg = CPDialog(self)
+        dlg = ExperimentDialog(exp_type, self, self.config)
         if dlg.exec():
             self._save_undo_state()
-            self.project.add_experiment(dlg.result)
+            self.project.add_experiment(dlg.experiment)
+            self.refresh()
+
+    def edit_experiment(self, row):
+        if not self.project or not 0 <= row < len(self.project.experiments):
+            return
+        original = self.project.experiments[row]
+        dlg = ExperimentDialog(original.exp_type, self, self.config, original)
+        if dlg.exec():
+            self._save_undo_state()
+            self.project.experiments[row] = dlg.experiment
             self.refresh()
 
     def _save_undo_state(self):
@@ -262,18 +311,28 @@ class MainWindow(QWidget):
     def refresh(self):
         if not self.project:
             self.table.setRowCount(0)
+            self.time_label.setText("预计耗时：00:00:00")
             return
+        self.project._reindex()
         self.table.setRowCount(len(self.project.experiments))
         for i, exp in enumerate(self.project.experiments):
             idx_item = QTableWidgetItem(str(i + 1))
             self.table.setItem(i, 0, idx_item)
             self.table.setItem(i, 1, QTableWidgetItem(exp.exp_type))
-            self.table.setItem(i, 2, QTableWidgetItem(exp.summary()))
+            summary = QTableWidgetItem(exp.summary())
+            summary.setToolTip(exp.summary())
+            self.table.setItem(i, 2, summary)
 
-        t = self.project.total_time()
+        t, unknown, bounded = self.project.time_info()
         h = int(t // 3600)
         m = int((t % 3600) // 60)
-        self.time_label.setText(f"预计耗时：{h:02d}:{m:02d}")
+        seconds = int(t % 60)
+        prefix = "可估算部分" if unknown else "预计耗时"
+        suffix = f"；另有 {unknown} 项由样品响应／仪器设置决定，无法确定总耗时" if unknown else ""
+        if bounded:
+            suffix += "；含时间上限，触及电位边界可能提前切换或结束"
+        self.time_label.setText(f"{prefix}：{h:02d}:{m:02d}:{seconds:02d}{suffix}")
+        self.time_label.setWordWrap(True)
 
     # ================================================================
     #  拖拽回调
@@ -302,12 +361,17 @@ class MainWindow(QWidget):
             QMessageBox.warning(
                 self,
                 "项目名非法",
-                "项目名不能包含 '.' 或 '/' 字符。\n\n请修改项目名后重试。"
+                "项目名不能为空，且不能包含文件名或宏命令不允许的字符。"
             )
             return
 
         self.project.update(project_name, self.folder_edit.text())
-        dlg = MacroDialog(self.project)
+        try:
+            self.project.to_macro(self.config.macro_overrides)
+        except ValueError as exc:
+            QMessageBox.warning(self, "无法生成宏", str(exc))
+            return
+        dlg = MacroDialog(self.project, self.config.macro_overrides)
         dlg.exec()
 
     # ================================================================
@@ -372,11 +436,14 @@ class MainWindow(QWidget):
             return
 
         menu = QMenu(self)
+        edit_action = menu.addAction("编辑该试验")
         delete_action = menu.addAction("删除该实验")
 
         action = menu.exec(self.table.viewport().mapToGlobal(pos))
         if action == delete_action:
             self.delete_experiment(row)
+        elif action == edit_action:
+            self.edit_experiment(row)
 
     def delete_experiment(self, row):
         if not self.project:

@@ -18,8 +18,8 @@ class Experiment(ABC):
         pass
 
     @abstractmethod
-    def estimate_time(self) -> float:
-        """估算实验耗时（秒）"""
+    def estimate_time(self) -> float | None:
+        """估算实验耗时（秒）；依赖样品响应时返回 None。"""
         pass
 
     @abstractmethod
@@ -42,15 +42,8 @@ class Experiment(ABC):
     @staticmethod
     def from_dict(data: dict) -> "Experiment":
         """从字典反序列化。根据 type 字段分发到对应子类。"""
-        exp_type = data.get("type", "")
-        if exp_type == "CV":
-            from core.cv import CVExperiment
-            return CVExperiment(**{k: v for k, v in data.items() if k != "type"})
-        elif exp_type == "EIS":
-            from core.eis import EISExperiment
-            return EISExperiment(**{k: v for k, v in data.items() if k != "type"})
-        elif exp_type == "CP":
-            from core.cp import CPExperiment
-            return CPExperiment(**{k: v for k, v in data.items() if k != "type"})
-        else:
-            raise ValueError(f"Unknown experiment type: {exp_type}")
+        from core.techniques.registry import create_experiment
+        if not isinstance(data, dict):
+            raise ValueError("试验配置必须为 JSON 对象。")
+        return create_experiment(data.get("type", ""),
+                                 {k: v for k, v in data.items() if k != "type"})
